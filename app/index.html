@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Gastos</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="topbar-inner">
+    <h1 id="titulo">Agosto</h1>
+    <div id="mes-nav" class="mes-nav">
+      <button id="mes-prev" class="icon-btn" aria-label="Mes anterior">‹</button>
+      <button id="mes-hoy" class="chip chip-sm">Hoy</button>
+      <button id="mes-next" class="icon-btn" aria-label="Mes siguiente">›</button>
+    </div>
+  </div>
+</header>
+
+<main id="vista"></main>
+
+<button id="fab" class="fab" aria-label="Cargar gasto">+</button>
+
+<nav id="tabs">
+  <button data-tab="mes"         class="tab activo"><span>◧</span>Mes</button>
+  <button data-tab="movimientos" class="tab"><span>≡</span>Gastos</button>
+  <button data-tab="planes"      class="tab"><span>▦</span>Cuotas</button>
+  <button data-tab="servicios"   class="tab"><span>◇</span>Servicios</button>
+  <button data-tab="ajustes"     class="tab"><span>⚙</span>Ajustes</button>
+</nav>
+
+<div id="hoja" class="hoja" hidden>
+  <div class="hoja-fondo" data-cerrar></div>
+  <div class="hoja-panel" role="dialog" aria-modal="true">
+    <div class="hoja-agarre" data-cerrar></div>
+    <div id="hoja-contenido"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

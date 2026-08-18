@@ -1,0 +1,18 @@
+# ─────────────────────────────────────────────────────────────
+#  DATOS PERSONALES — nada de esto puede entrar al repositorio.
+#  Git guarda el historial para siempre: si algo se sube una vez,
+#  borrarlo en un commit posterior NO lo saca.
+# ─────────────────────────────────────────────────────────────
+
+# Respaldos exportados desde la app (sueldo, gastos, servicios)
+*.json
+!app/manifest.webmanifest
+!.claude/launch.json
+
+# El handoff, el plan financiero y la planilla original
+docs/
+files.zip
+
+# Windows
+Thumbs.db
+desktop.ini
