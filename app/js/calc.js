@@ -5,7 +5,7 @@
 //   - movimientos y servicios -> mes CALENDARIO
 // No unificar: responden a preguntas distintas.
 
-import { CATEGORIAS, difMeses, mesDe, addMeses } from './model.js';
+import { difMeses, mesDe, addMeses } from './model.js';
 import { cuotaDe } from './store.js';
 
 const suma = (arr, fn) => arr.reduce((a, x) => a + (fn(x) || 0), 0);
@@ -120,7 +120,10 @@ export function resumenMes(st, mes) {
 // apareciendo en su categoría todos los meses hasta que termine.
 
 export function porCategoria(st, mes) {
-  const filas = new Map(CATEGORIAS.map((c) => [c, { categoria: c, unPago: 0, cuotas: 0, total: 0 }]));
+  // El catálogo sale de la config, que es editable. Igual fila() acepta cualquier
+  // categoría que aparezca en los datos y no esté en la lista.
+  const catalogo = (st.config.categorias || []).map((c) => c.nombre);
+  const filas = new Map(catalogo.map((c) => [c, { categoria: c, unPago: 0, cuotas: 0, total: 0 }]));
   const fila = (c) => {
     if (!filas.has(c)) filas.set(c, { categoria: c || 'Otros', unPago: 0, cuotas: 0, total: 0 });
     return filas.get(c);

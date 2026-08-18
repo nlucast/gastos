@@ -35,13 +35,14 @@ La app arranca vacía. Lo primero es cargar el sueldo en Ajustes, o importar un 
 
 | | |
 |---|---|
-| **Mes** | Semáforo del techo, ritmo de gasto por día, compromisos nuevos, desglose por categoría y calendario de 12 meses. El mes se cambia con las flechas de arriba. |
+| **Mes** | Semáforo del techo, ritmo de gasto por día, compromisos nuevos, desglose por categoría y calendario de 12 meses. El mes se cambia con las flechas de los extremos. El orden de las secciones se configura en Ajustes. |
 | **Gastos** | Los movimientos del mes. Tocá uno para editarlo. |
 | **Cuotas** | Planes activos, cuánto pesa cada tarjeta en el cierre, total pendiente. |
 | **Servicios** | Boletas con reparto, marca de pagado y alerta de vencidas. |
-| **Ajustes** | Sueldo, meta de ahorro del mes, cotización del dólar, fijos, respaldos. |
+| **Ajustes** | Sueldo, meta de ahorro del mes, cotización del dólar, categorías, servicios, fijos, orden de la pantalla Mes, respaldos. |
 
-El botón **+** carga un gasto desde cualquier pantalla.
+El botón **+** carga un gasto desde cualquier pantalla. El **◉** al lado del título oculta todos
+los importes, para mirar la app con alguien al lado.
 
 ## Las reglas que tiene adentro
 
@@ -58,6 +59,12 @@ El botón **+** carga un gasto desde cualquier pantalla.
   Eso ya está descontado del disponible.
 - **Servicios**: con menos de 4 boletas cargadas el mes se considera incompleto y usa el
   promedio de los últimos 3 meses completos, avisando que el disponible está inflado.
+- **Las categorías se editan** (agregar, renombrar, ordenar, marcar como cotidiano). Renombrar
+  arrastra los gastos y los planes que la usaban; una categoría en uso no se puede borrar,
+  porque sus gastos quedarían fuera del desglose.
+- **Ocultar valores** tapa los importes en toda la app, pero no los cálculos en vivo de los
+  formularios: el importe que los alimenta ya está a la vista y taparlos sacaría la defensa
+  contra cargar la cuota en vez del total.
 - Toda la plata se guarda **en centavos enteros**. Nada de decimales flotantes.
 - Un mes es siempre el día 1. Conviven a propósito el mes de **cierre** (planes, calendario) y
   el mes **calendario** (gastos, servicios): responden a preguntas distintas.

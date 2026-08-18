@@ -1,6 +1,6 @@
 # Retomar el proyecto
 
-Estado al **17/08/2026**. Este documento sirve para seguir desde otra computadora sin volver
+Estado al **18/08/2026**. Este documento sirve para seguir desde otra computadora sin volver
 a discutir lo ya decidido. Pegalo entero al inicio de una sesión nueva.
 
 ---
@@ -73,7 +73,9 @@ Todo vive en una sola clave de `localStorage` (`gastos.v1`) con esta forma:
 
 ```
 config       { sueldoNeto, cotizacionUsd, metaAhorroDefault, metaAhorro{mes},
-               diaCorteCierre, coTitular }
+               diaCorteCierre, coTitular,
+               categorias[{ nombre, vigilada }], catalogoServicios[nombre],
+               ordenMes[idSeccion], ocultarValores }
 movimientos  [{ id, fecha, canal, concepto, descripcion, categoria,
                 tipo, cantCuotas, importeTotal }]
 planes       [{ id, origen, movimientoId, tarjeta, concepto, descripcion,
@@ -93,6 +95,13 @@ servicios    [{ id, mes, servicio, vencimiento, total, reparto,
 - **`ultimoCierre` se deriva**, nunca se guarda a mano: `primerCierre + (totalCuotas - 1)`.
 - **`reparto` se guarda como token neutro** (`50/50`, `otro100`, `mio100`) y el nombre que se
   muestra sale de `config.coTitular`. Así el código no lleva adentro el nombre de nadie.
+- **Las categorías y los nombres de servicio son configuración, no código.** `model.js` sólo
+  trae el catálogo de arranque; lo que manda es `config`. `hidratar()` completa los catálogos
+  una sola vez desde los defaults más todo lo que ya esté usado en los datos: si algo cargado
+  quedara fuera del catálogo, desaparecería del desglose sin avisar.
+- **Renombrar arrastra los datos.** Cambiar el nombre de una categoría lo cambia en todos sus
+  movimientos y planes; el de un servicio, en todas sus boletas. Los nombres son la clave: sin
+  el arrastre quedan registros apuntando a algo que ya no existe.
 
 ### Dos convenciones de mes conviven a propósito
 
@@ -128,6 +137,16 @@ otra es "cuánto gasté este mes".
    umbral, un mes con una sola boleta se toma como completo y el disponible se dispara.
 9. **`pagado` lo define el usuario, no el banco.** El home banking a veces muestra como impaga
    una boleta ya pagada.
+10. **Una categoría en uso no se borra.** Se renombra. Borrarla dejaría sus gastos fuera del
+    desglose, que es la misma falla que la regla 3 evita en los planes.
+11. **El cotidiano bajo vigilancia dejó de ser "las primeras cuatro"** y pasó a ser una marca
+    por categoría (`vigilada`). Con categorías reordenables, la posición ya no significa nada.
+12. **Ocultar valores es sólo presentación.** Vive en `model.js`, envuelve `money()` y
+    `moneyShort()`, y no toca un solo cálculo. Los cálculos en vivo de los formularios usan
+    `moneyCalc()` y **no** se ocultan: el importe que los alimenta ya está a la vista en el
+    input de arriba, así que taparlos no agrega privacidad y sí saca la defensa de la regla 1.
+    En Ajustes pasa lo contrario: con los valores ocultos, sueldo y meta quedan deshabilitados
+    y el guardado los saltea, porque un input vacío guardaría cero.
 
 ---
 
@@ -192,6 +211,8 @@ Ordenado por lo que más valor agrega:
       caen en esa tarjeta + servicios que se pagan con ella. Si no se contemplan los fijos, la
       conciliación marca todo como "no registrado" y a las dos veces se deja de mirar.
 - [ ] Tabla de cierres reales por tarjeta, para reemplazar la aproximación del día 26.
+- [ ] Un `repartoDefault` por servicio del catálogo, para que la boleta nueva ya venga con el
+      reparto puesto. Hoy el catálogo guarda sólo el nombre.
 - [ ] Notificación al cruzar el 80% del techo.
 - [ ] Cierre de mes guiado y histórico por categoría.
 
@@ -209,9 +230,15 @@ No hay tests automatizados. El control es contra los datos reales: importá el r
 comprobá que los totales del mes de referencia coincidan con los de la planilla original
 (`docs/`, local). Si `calc.js` cambia y esos números se mueven, el cambio está mal.
 
+Para comparar contra la versión anterior sin leer los datos: capturar el `innerText` de cada
+pantalla, `git stash` de `app/`, recargar y comparar sólo los importes. Ojo con la cache HTTP
+del navegador, que sirve módulos viejos aunque el servidor tenga los nuevos: forzar con
+`fetch(url, { cache: 'reload' })` antes de recargar.
+
 Los puntos que más se rompen:
 
 - `parseMoney` con formato argentino (`129.000` vs `129,00`).
 - El corte del día 26 al generar el primer cierre.
 - El umbral de 4 servicios y el promedio de meses completos.
 - El desglose por categoría sumando dos veces el mes de la compra de un plan.
+- El renombre de una categoría o un servicio dejando registros huérfanos.

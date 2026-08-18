@@ -40,16 +40,36 @@ button { cursor: pointer; }
   border-bottom: 1px solid var(--linea);
 }
 .topbar-inner {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 12px 16px;
+  /* Arriba y no al centro: cuando aparece el chip "Hoy" en una segunda fila, las
+     flechas tienen que seguir alineadas con el título, no flotar entre las dos. */
+  display: flex; align-items: flex-start; gap: 8px; padding: 12px;
 }
-#titulo { font-size: 19px; letter-spacing: -.2px; }
-.mes-nav { display: flex; align-items: center; gap: 4px; }
+/* El centro se estira y las flechas quedan pegadas a los extremos. */
+.topbar-centro {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.topbar-titulo { display: flex; align-items: center; gap: 8px; min-width: 0; height: 32px; }
+/* Hueco del mismo ancho que el ojo, del otro lado: sin esto el ojo corre el
+   título a la izquierda y deja de estar centrado de verdad. */
+.topbar-titulo::before { content: ''; flex: none; width: 27px; }
+#titulo {
+  font-size: 19px; letter-spacing: -.2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .icon-btn {
+  flex: none;
   width: 32px; height: 32px; border: 0; border-radius: 9px;
   background: var(--bg-3); color: var(--txt-2); font-size: 19px; line-height: 1;
 }
 .icon-btn:active { background: var(--linea); }
+/* El ojo va pegado al título: no gasta una fila entera y queda a un toque. */
+.ojo-btn {
+  flex: none;
+  width: 27px; height: 27px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--txt-3); font-size: 15px; line-height: 1;
+}
+.ojo-btn[aria-pressed="true"] { background: var(--bg-3); color: var(--acento); }
 
 /* ---------- layout ---------- */
 
@@ -185,6 +205,31 @@ input.grande { font-size: 27px; font-weight: 650; padding: 12px; text-align: rig
 
 .hint { font-size: 12px; color: var(--txt-3); margin-top: 6px; }
 .hint.calc { color: var(--acento); font-weight: 600; font-size: 14px; }
+
+/* ---------- listas que se ordenan a mano ---------- */
+/* Flechitas y no arrastrar: en el celular, con una mano, arrastrar falla. */
+
+.orden { display: flex; flex-direction: column; }
+.orden-fila {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-top: 1px solid var(--linea);
+}
+.orden-fila:first-child { border-top: 0; }
+.orden-flechas { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.mini-btn {
+  width: 30px; height: 21px; border: 0; border-radius: 6px;
+  background: var(--bg-3); color: var(--txt-2); font-size: 12px; line-height: 1;
+}
+.mini-btn:disabled { opacity: .3; }
+.orden-nombre {
+  flex: 1; min-width: 0; text-align: left; border: 0; background: none;
+  color: var(--txt); padding: 4px 0; display: flex; flex-direction: column; gap: 2px;
+}
+.orden-nombre .t { font-size: 14px; }
+.orden-nombre .d { font-size: 11px; color: var(--txt-3); }
+.orden-fija { opacity: .55; }
+
+.tag.cotidiano { background: color-mix(in srgb, var(--atencion) 22%, transparent); color: var(--atencion); }
 
 /* ---------- FAB + tabs ---------- */
 

@@ -1,8 +1,10 @@
 // app.js — pantallas y eventos.
 
 import {
-  CANALES, TARJETAS, CATEGORIAS, CATEGORIAS_COTIDIANO, REPARTOS, repartoLabel,
-  money, moneyShort, parseMoney, hoyISO, mesDe, mesHoy, addMeses, difMeses,
+  CANALES, TARJETAS, REPARTOS, repartoLabel, SECCIONES_MES,
+  money, moneyShort, moneyCalc, moneyCalcShort, usd, montoInput, parseMoney,
+  setOcultarValores, valoresOcultos,
+  hoyISO, mesDe, mesHoy, addMeses, difMeses,
   mesLabel, mesLabelLargo, fechaLabel,
 } from './model.js';
 import * as db from './store.js';
@@ -113,9 +115,11 @@ function vistaMes(st) {
     ? `Te pasaste ${money(-r.restante)}`
     : `te quedan de ${money(r.techo)}`;
 
-  vista.innerHTML = `
-    ${avisos.join('')}
-
+  // Cada bloque se arma por separado y el orden sale de config.ordenMes, que se
+  // edita en Ajustes. Los avisos quedan afuera a propósito: van siempre primero,
+  // porque son lo único de esta pantalla que pide una acción.
+  const seccion = {
+    semaforo: () => `
     <div class="card semaforo ${r.estado}">
       <div class="estado">${r.estado === 'ATENCION' ? 'ATENCIÓN' : r.estado}</div>
       <div class="grande ${r.estado === 'PASADO' ? 'pasado' : ''}">${money(Math.abs(r.restante))}</div>
@@ -126,9 +130,9 @@ function vistaMes(st) {
         Día ${rt.dia} de ${rt.diasMes} · ${moneyShort(rt.porDia)}/día hasta ahora ·
         ${rt.disponiblePorDia > 0 ? `${moneyShort(rt.disponiblePorDia)}/día para llegar` : 'sin margen diario'}
       </div>` : ''}
-    </div>
+    </div>`,
 
-    ${r.nuevos.cantidad ? `
+    nuevos: () => !r.nuevos.cantidad ? '' : `
     <div class="card nuevos">
       <div class="card-t">Compromisos nuevos de este mes</div>
       <div class="destacado">${money(r.nuevos.cuotaAgregada)}</div>
@@ -136,8 +140,9 @@ function vistaMes(st) {
       <div class="fila"><span class="k">Total asumido</span><span class="v">${money(r.nuevos.total)}</span></div>
       <div class="fila"><span class="k">Planes nuevos</span><span class="v">${r.nuevos.cantidad}</span></div>
       <div class="sub" style="margin-top:10px">No cuentan contra el techo de este mes: se descuentan del disponible de los meses que vienen.</div>
-    </div>` : ''}
+    </div>`,
 
+    techo: () => `
     <div class="card">
       <div class="card-t">De dónde sale el techo</div>
       <div class="fila"><span class="k">Sueldo neto</span><span class="v">${money(st.config.sueldoNeto)}</span></div>
@@ -146,12 +151,13 @@ function vistaMes(st) {
       <div class="fila fuerte"><span class="k">Disponible</span><span class="v">${money(r.disponible)}</span></div>
       <div class="fila"><span class="k">Meta de ahorro</span><span class="v">− ${money(r.meta)}</span></div>
       <div class="fila fuerte"><span class="k">Techo del mes</span><span class="v">${money(r.techo)}</span></div>
-    </div>
+    </div>`,
 
+    categorias: () => `
     <div class="card">
       <div class="card-t">Por categoría</div>
       ${cats.length ? cats.map((c) => {
-        const vig = CATEGORIAS_COTIDIANO.includes(c.categoria);
+        const vig = db.esVigilada(c.categoria);
         const w = (n) => (n / maxCat) * 100;
         return `<div class="cat ${vig ? 'vigilada' : ''}">
           <div class="cab"><span class="n">${esc(c.categoria)}</span><span class="m">${money(c.total)}</span></div>
@@ -162,9 +168,10 @@ function vistaMes(st) {
           </div>
         </div>`;
       }).join('') : '<div class="vacio">Sin gastos cargados en este mes.</div>'}
-      ${cats.length ? '<div class="sub" style="margin-top:12px">● las cuatro categorías del cotidiano bajo vigilancia. La barra clara es la cuota del mes de los planes activos.</div>' : ''}
-    </div>
+      ${cats.length ? '<div class="sub" style="margin-top:12px">● las categorías del cotidiano, las que están bajo vigilancia. La barra clara es la cuota del mes de los planes activos.</div>' : ''}
+    </div>`,
 
+    calendario: () => `
     <div class="card">
       <div class="card-t">Próximos meses</div>
       <div class="tabla-wrap">
@@ -181,8 +188,11 @@ function vistaMes(st) {
           </tbody>
         </table>
       </div>
-    </div>
-  `;
+    </div>`,
+  };
+
+  vista.innerHTML = avisos.join('') +
+    st.config.ordenMes.map((id) => (seccion[id] ? seccion[id]() : '')).join('');
 }
 
 /* ================= pantalla: MOVIMIENTOS ================= */
@@ -339,14 +349,28 @@ function vistaServicios(st) {
 function vistaAjustes(st) {
   const meta = mesSel in st.config.metaAhorro ? st.config.metaAhorro[mesSel] : st.config.metaAhorroDefault;
   const cot = st.config.cotizacionUsd;
+  const oculto = valoresOcultos();
+  const cats = st.config.categorias;
+  const catServ = st.config.catalogoServicios;
+
+  // Flechitas en vez de arrastrar: en el celular, con una mano, arrastrar falla.
+  const flechas = (attr, valor, i, largo) => `
+    <div class="orden-flechas">
+      <button class="mini-btn" data-${attr}-sube="${esc(valor)}" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
+      <button class="mini-btn" data-${attr}-baja="${esc(valor)}" ${i === largo - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button>
+    </div>`;
 
   vista.innerHTML = `
     <div class="card">
       <div class="card-t">Plata que entra</div>
+      ${oculto ? `<div class="aviso"><span>◌</span><div>Los valores están <b>ocultos</b>. Tocá el ◌ de arriba
+        para mostrarlos: el sueldo y la meta no se pueden editar a ciegas.</div></div>` : ''}
       <div class="campo"><label>Sueldo neto</label>
-        <input type="text" inputmode="decimal" id="cfg-sueldo" value="${(st.config.sueldoNeto / 100).toFixed(2)}"></div>
+        <input type="text" inputmode="decimal" id="cfg-sueldo" value="${montoInput(st.config.sueldoNeto)}"
+               ${oculto ? 'disabled placeholder="•••••"' : ''}></div>
       <div class="campo"><label>Meta de ahorro de ${mesLabel(mesSel)}</label>
-        <input type="text" inputmode="decimal" id="cfg-meta" value="${(meta / 100).toFixed(2)}">
+        <input type="text" inputmode="decimal" id="cfg-meta" value="${montoInput(meta)}"
+               ${oculto ? 'disabled placeholder="•••••"' : ''}>
         <div class="hint">Es por mes. Está en cero hasta nov/26 a propósito: una meta incumplible deja el semáforo siempre en rojo.</div></div>
       <div class="campo"><label>Cotización del dólar</label>
         <input type="text" inputmode="decimal" id="cfg-cot" value="${cot ? (cot / 100).toFixed(2) : ''}" placeholder="pendiente">
@@ -355,6 +379,40 @@ function vistaAjustes(st) {
         <input type="text" id="cfg-cotitular" value="${esc(st.config.coTitular || '')}" placeholder="Co-titular">
         <div class="hint">Solo el nombre que se muestra en la pantalla de Servicios.</div></div>
       <button class="btn" id="cfg-guardar">Guardar</button>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Categorías</div>
+      <div class="orden">
+        ${cats.map((c, i) => `
+          <div class="orden-fila">
+            ${flechas('cat', c.nombre, i, cats.length)}
+            <button class="orden-nombre" data-cat="${esc(c.nombre)}">
+              <span class="t">${esc(c.nombre)}${c.vigilada ? '<span class="tag cotidiano">cotidiano</span>' : ''}</span>
+              <span class="d">${db.usoCategoria(c.nombre)} usos · tocá para editar</span>
+            </button>
+          </div>`).join('')}
+      </div>
+      <div class="btn-fila"><button class="btn sec" id="nueva-cat">Agregar categoría</button></div>
+      <div class="sub" style="margin-top:10px">Este orden es el que ves al cargar un gasto: poné arriba las que más usás.
+        Las de <b>cotidiano</b> son las que la pantalla de Mes marca con ●.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Servicios</div>
+      <div class="orden">
+        ${catServ.map((n, i) => `
+          <div class="orden-fila">
+            ${flechas('sc', n, i, catServ.length)}
+            <button class="orden-nombre" data-sc="${esc(n)}">
+              <span class="t">${esc(n)}</span>
+              <span class="d">${db.usoServicio(n)} boletas · tocá para editar</span>
+            </button>
+          </div>`).join('') || '<div class="vacio">Todavía no hay servicios. Agregá los que pagás todos los meses.</div>'}
+      </div>
+      <div class="btn-fila"><button class="btn sec" id="nuevo-sc">Agregar servicio</button></div>
+      <div class="sub" style="margin-top:10px">Es la lista que aparece en el desplegable al cargar una boleta. Acá no van importes:
+        el importe cambia todos los meses y se carga en cada boleta.</div>
     </div>
 
     <div class="card">
@@ -371,11 +429,27 @@ function vistaAjustes(st) {
       <div class="card-t">Fijos en dólares</div>
       <div class="lista">
         ${st.fijosUsd.map((f) => `<button class="item" data-fijousd="${f.id}">
-          <div class="cuerpo"><div class="t">${esc(f.concepto)}</div><div class="d">${esc(f.canal)} · USD ${(f.montoUsd / 100).toFixed(2)}</div></div>
+          <div class="cuerpo"><div class="t">${esc(f.concepto)}</div><div class="d">${esc(f.canal)} · ${usd(f.montoUsd)}</div></div>
           <div class="monto">${cot ? money(Math.round(f.montoUsd * cot / 100)) : '<span class="sub">sin cotiz.</span>'}</div></button>`).join('')}
       </div>
       <div class="btn-fila"><button class="btn sec" id="nuevo-fijousd">Agregar fijo en USD</button></div>
       <div class="sub" style="margin-top:10px">Si un servicio en dólares lo cobra una tarjeta en pesos, con recargo, y además se comparte, no va acá: va en Servicios.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">Orden de la pantalla Mes</div>
+      <div class="orden">
+        ${st.config.ordenMes.map((id, i) => {
+          const sec = SECCIONES_MES.find((x) => x.id === id);
+          return `<div class="orden-fila">
+            ${flechas('sec', id, i, st.config.ordenMes.length)}
+            <span class="orden-nombre"><span class="t">${esc(sec ? sec.label : id)}</span></span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="btn-fila"><button class="btn sec" id="orden-reset">Volver al orden original</button></div>
+      <div class="sub" style="margin-top:10px">Los avisos van siempre arriba de todo, no se mueven.
+        <b>Compromisos nuevos</b> aparece sólo en los meses en que asumiste cuotas nuevas.</div>
     </div>
 
     <div class="card">
@@ -394,14 +468,30 @@ function vistaAjustes(st) {
   `;
 
   $('#cfg-guardar').addEventListener('click', () => {
-    db.setConfig({
-      sueldoNeto: parseMoney($('#cfg-sueldo').value),
+    const patch = {
       cotizacionUsd: parseMoney($('#cfg-cot').value),
       coTitular: $('#cfg-cotitular').value.trim() || 'Co-titular',
-    });
-    db.setMetaAhorro(mesSel, parseMoney($('#cfg-meta').value));
-    toast('Guardado');
+    };
+    // Con los valores ocultos el input está vacío: guardarlo pondría el sueldo en cero.
+    if (!oculto) patch.sueldoNeto = parseMoney($('#cfg-sueldo').value);
+    db.setConfig(patch);
+    if (!oculto) db.setMetaAhorro(mesSel, parseMoney($('#cfg-meta').value));
+    toast(oculto ? 'Guardado (sueldo y meta quedaron como estaban)' : 'Guardado');
   });
+
+  $$('[data-cat-sube]', vista).forEach((b) => b.addEventListener('click', () => db.moverCategoria(b.dataset.catSube, -1)));
+  $$('[data-cat-baja]', vista).forEach((b) => b.addEventListener('click', () => db.moverCategoria(b.dataset.catBaja, 1)));
+  $$('[data-cat]', vista).forEach((b) => b.addEventListener('click', () => hojaCategoria(b.dataset.cat)));
+  $('#nueva-cat').addEventListener('click', () => hojaCategoria(null));
+
+  $$('[data-sc-sube]', vista).forEach((b) => b.addEventListener('click', () => db.moverServicioCatalogo(b.dataset.scSube, -1)));
+  $$('[data-sc-baja]', vista).forEach((b) => b.addEventListener('click', () => db.moverServicioCatalogo(b.dataset.scBaja, 1)));
+  $$('[data-sc]', vista).forEach((b) => b.addEventListener('click', () => hojaServicioCatalogo(b.dataset.sc)));
+  $('#nuevo-sc').addEventListener('click', () => hojaServicioCatalogo(null));
+
+  $$('[data-sec-sube]', vista).forEach((b) => b.addEventListener('click', () => db.moverSeccionMes(b.dataset.secSube, -1)));
+  $$('[data-sec-baja]', vista).forEach((b) => b.addEventListener('click', () => db.moverSeccionMes(b.dataset.secBaja, 1)));
+  $('#orden-reset').addEventListener('click', () => { db.resetOrdenMes(); toast('Orden original'); });
 
   $$('[data-fijo]', vista).forEach((b) => b.addEventListener('click', () => hojaFijo(st.fijosPesos.find((f) => f.id === b.dataset.fijo), false)));
   $$('[data-fijousd]', vista).forEach((b) => b.addEventListener('click', () => hojaFijo(st.fijosUsd.find((f) => f.id === b.dataset.fijousd), true)));
@@ -435,6 +525,94 @@ function vistaAjustes(st) {
     if (!confirm('Borra todo lo cargado en este navegador y no se puede deshacer.\n\n¿Exportaste antes?')) return;
     db.reset();
     toast('Listo, todo vacío');
+  });
+}
+
+/* ================= hoja: CATEGORÍA ================= */
+
+function hojaCategoria(nombre) {
+  const editando = !!nombre;
+  const cat = editando ? db.categorias().find((c) => c.nombre === nombre) : { nombre: '', vigilada: false };
+  if (!cat) return;
+  const uso = editando ? db.usoCategoria(nombre) : 0;
+
+  abrirHoja(`
+    <h2>${editando ? 'Editar categoría' : 'Nueva categoría'}</h2>
+    <div class="campo"><label>Nombre</label>
+      <input type="text" id="c-nombre" value="${esc(cat.nombre)}" placeholder="cómo la vas a llamar">
+      ${uso ? `<div class="hint">La usan ${uso} registro${uso === 1 ? '' : 's'}. Si la renombrás, se renombran también.</div>` : ''}</div>
+
+    <div class="campo"><label>¿Es del cotidiano?</label>
+      <div class="chips">${chips([{ v: 'si', t: 'Sí, vigilada' }, { v: 'no', t: 'No' }], cat.vigilada ? 'si' : 'no', 'vig')}</div>
+      <div class="hint">Las del cotidiano se marcan con ● en la pantalla de Mes: son las que se descontrolan de a poco, sin una compra grande que te avise.</div></div>
+
+    <button class="btn" id="c-guardar">Guardar</button>
+    ${editando ? `<div class="btn-fila"><button class="btn peligro" id="c-borrar" ${uso ? 'disabled' : ''}>Borrar</button></div>
+      ${uso ? '<div class="sub">Una categoría en uso no se borra: los gastos quedarían fuera del desglose. Renombrala.</div>' : ''}` : ''}
+  `, (raiz) => {
+    conectarChips(raiz);
+    const inp = $('#c-nombre', raiz);
+
+    $('#c-guardar', raiz).addEventListener('click', () => {
+      const n = inp.value.trim();
+      const vig = chipValor(raiz, 'vig') === 'si';
+      if (!n) return toast('Falta el nombre');
+      if (editando) {
+        if (n !== nombre && !db.renombrarCategoria(nombre, n)) return toast('Ya existe una categoría con ese nombre');
+        db.setVigilada(n, vig);
+      } else if (!db.addCategoria(n, vig)) {
+        return toast('Ya existe una categoría con ese nombre');
+      }
+      cerrarHoja(); toast('Guardado');
+    });
+
+    const btnBorrar = $('#c-borrar', raiz);
+    if (btnBorrar) btnBorrar.addEventListener('click', () => {
+      if (!confirm(`¿Borrar la categoría "${nombre}"?`)) return;
+      if (!db.delCategoria(nombre)) return toast('Está en uso, no se puede borrar');
+      cerrarHoja(); toast('Borrada');
+    });
+    if (!editando) inp.focus();
+  });
+}
+
+/* ================= hoja: SERVICIO DEL CATÁLOGO ================= */
+
+function hojaServicioCatalogo(nombre) {
+  const editando = !!nombre;
+  const uso = editando ? db.usoServicio(nombre) : 0;
+
+  abrirHoja(`
+    <h2>${editando ? 'Editar servicio' : 'Nuevo servicio'}</h2>
+    <div class="campo"><label>Nombre</label>
+      <input type="text" id="sc-nombre" value="${esc(nombre || '')}" placeholder="Luz, Gas, Internet…">
+      ${uso ? `<div class="hint">Hay ${uso} boleta${uso === 1 ? '' : 's'} con este nombre. Si lo cambiás, se cambia en todas.</div>` : ''}</div>
+
+    <div class="sub">Esta lista es la que ofrece el desplegable al cargar una boleta. Los importes van en cada boleta, no acá.</div>
+    <button class="btn" id="sc-guardar" style="margin-top:14px">Guardar</button>
+    ${editando ? `<div class="btn-fila"><button class="btn peligro" id="sc-borrar" ${uso ? 'disabled' : ''}>Borrar</button></div>
+      ${uso ? '<div class="sub">Tiene boletas cargadas. Si lo borrás, esas boletas quedan sin su nombre en la lista.</div>' : ''}` : ''}
+  `, (raiz) => {
+    const inp = $('#sc-nombre', raiz);
+
+    $('#sc-guardar', raiz).addEventListener('click', () => {
+      const n = inp.value.trim();
+      if (!n) return toast('Falta el nombre');
+      if (editando) {
+        if (n !== nombre && !db.renombrarServicioCatalogo(nombre, n)) return toast('Ya existe un servicio con ese nombre');
+      } else if (!db.addServicioCatalogo(n)) {
+        return toast('Ya existe un servicio con ese nombre');
+      }
+      cerrarHoja(); toast('Guardado');
+    });
+
+    const btnBorrar = $('#sc-borrar', raiz);
+    if (btnBorrar) btnBorrar.addEventListener('click', () => {
+      if (!confirm(`¿Sacar "${nombre}" de la lista?`)) return;
+      if (!db.delServicioCatalogo(nombre)) return toast('Tiene boletas cargadas');
+      cerrarHoja(); toast('Borrado');
+    });
+    inp.focus();
   });
 }
 
@@ -486,7 +664,7 @@ function hojaGasto(mov) {
   const m = mov || {
     fecha: hoyISO(),
     canal: db.frecuencias('canal')[0] || 'VISA',
-    categoria: db.frecuencias('categoria')[0] || CATEGORIAS[0],
+    categoria: db.frecuencias('categoria')[0] || db.nombresCategorias()[0] || '',
     tipo: '1 pago', cantCuotas: null, importeTotal: 0, concepto: '', descripcion: '',
   };
   const conceptos = [...new Set(st.movimientos.map((x) => x.concepto).filter(Boolean))];
@@ -513,7 +691,7 @@ function hojaGasto(mov) {
       <input type="text" id="g-desc" value="${esc(m.descripcion || '')}" placeholder="qué compraste"></div>
 
     <div class="campo"><label>Categoría</label>
-      <div class="chips">${chips(CATEGORIAS, m.categoria, 'categoria')}</div></div>
+      <div class="chips">${chips(db.nombresCategorias(), m.categoria, 'categoria')}</div></div>
 
     <div class="campo"><label>Tipo</label>
       <div class="chips">${chips(['1 pago', 'Cuotas'], m.tipo, 'tipo')}</div></div>
@@ -555,7 +733,7 @@ function hojaGasto(mov) {
       let txt = '';
       if (esCuotas && n && total) {
         const cierre = db.cierreDeCompra($('#g-fecha', raiz).value || hoyISO());
-        txt = `${n} cuotas de ${money(Math.round(total / n))} · primer cierre ${mesLabel(cierre)}`;
+        txt = `${n} cuotas de ${moneyCalc(Math.round(total / n))} · primer cierre ${mesLabel(cierre)}`;
       } else if (esCuotas && total && !n) {
         txt = 'Elegí en cuántas cuotas.';
       }
@@ -616,7 +794,7 @@ function hojaGasto(mov) {
 function hojaPlan(plan) {
   const editando = !!plan;
   const p = plan || {
-    tarjeta: 'VISA', concepto: '', descripcion: '', categoria: CATEGORIAS[0],
+    tarjeta: 'VISA', concepto: '', descripcion: '', categoria: db.nombresCategorias()[0] || '',
     cuota: 0, totalCuotas: 3, primerCierre: mesHoy(), origen: 'manual',
   };
   const auto = p.origen === 'auto';
@@ -640,7 +818,7 @@ function hojaPlan(plan) {
     <div class="campo"><label>Tarjeta</label><div class="chips">${chips(TARJETAS, p.tarjeta, 'tarjeta')}</div></div>
     <div class="campo"><label>Dónde</label><input type="text" id="p-concepto" value="${esc(p.concepto)}" ${auto ? 'disabled' : ''}></div>
     <div class="campo"><label>Qué fue</label><input type="text" id="p-desc" value="${esc(p.descripcion || '')}" ${auto ? 'disabled' : ''}></div>
-    <div class="campo"><label>Categoría</label><div class="chips">${chips(CATEGORIAS, p.categoria, 'categoria')}</div>
+    <div class="campo"><label>Categoría</label><div class="chips">${chips(db.nombresCategorias(), p.categoria, 'categoria')}</div>
       <div class="hint">Sin categoría la cuota desaparece del desglose después del mes de la compra.</div></div>
 
     <button class="btn" id="p-guardar">Guardar</button>
@@ -651,7 +829,7 @@ function hojaPlan(plan) {
       const cuota = parseMoney($('#p-cuota', raiz).value);
       const desde = $('#p-cierre', raiz).value || mesHoy();
       $('#p-calc', raiz).textContent = n && cuota
-        ? `${moneyShort(cuota * n)} pendientes · de ${mesLabel(desde)} a ${mesLabel(addMeses(desde, n - 1))}`
+        ? `${moneyCalcShort(cuota * n)} pendientes · de ${mesLabel(desde)} a ${mesLabel(addMeses(desde, n - 1))}`
         : '';
     };
     conectarChips(raiz);
@@ -689,8 +867,10 @@ function hojaServicio(serv) {
   const editando = !!serv;
   const s = serv || { mes: mesSel, servicio: '', vencimiento: '', total: 0, reparto: '50/50', pagado: false, fechaPago: null };
   const co = db.get().config.coTitular || 'Co-titular';
-  // Los que ya usaste antes, para no tipearlos de nuevo.
-  const conocidos = [...new Set(db.get().servicios.map((x) => x.servicio).filter(Boolean))];
+  // El catálogo se edita en Ajustes. Si la boleta trae un nombre que no está
+  // (o el catálogo está vacío), arranca en "Otro" con el texto escrito.
+  const catalogo = db.catalogoServicios();
+  const arrancaOtro = !catalogo.length || (!!s.servicio && !catalogo.includes(s.servicio));
 
   abrirHoja(`
     <h2>${editando ? esc(s.servicio) : 'Nueva boleta'}</h2>
@@ -699,8 +879,14 @@ function hojaServicio(serv) {
       <div class="hint calc" id="s-calc"></div></div>
 
     <div class="campo"><label>Servicio</label>
-      <input type="text" id="s-nombre" list="lista-servicios" value="${esc(s.servicio)}">
-      <datalist id="lista-servicios">${conocidos.map((c) => `<option value="${c}">`).join('')}</datalist></div>
+      <select id="s-nombre">
+        <option value="" disabled ${!s.servicio && !arrancaOtro ? 'selected' : ''}>Elegí cuál…</option>
+        ${catalogo.map((n) => `<option value="${esc(n)}" ${n === s.servicio ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+        <option value="__otro" ${arrancaOtro ? 'selected' : ''}>Otro (escribir)</option>
+      </select>
+      <input type="text" id="s-nombre-otro" placeholder="nombre del servicio" style="margin-top:8px"
+             value="${arrancaOtro ? esc(s.servicio) : ''}" ${arrancaOtro ? '' : 'hidden'}>
+      <div class="hint">La lista se ordena y se edita en Ajustes → Servicios. Lo que escribas en “Otro” se agrega solo.</div></div>
 
     <div class="fila-campos">
       <div class="campo"><label>Mes</label><input type="month" id="s-mes" value="${s.mes}"></div>
@@ -718,14 +904,22 @@ function hojaServicio(serv) {
       const total = parseMoney($('#s-total', raiz).value);
       const rep = chipValor(raiz, 'reparto');
       const mio = rep === 'otro100' ? 0 : rep === 'mio100' ? total : Math.round(total / 2);
-      $('#s-calc', raiz).textContent = total ? `Te toca ${money(mio)} · a ${co} ${money(total - mio)}` : '';
+      $('#s-calc', raiz).textContent = total ? `Te toca ${moneyCalc(mio)} · a ${co} ${moneyCalc(total - mio)}` : '';
     };
     conectarChips(raiz, refrescar);
     $('#s-total', raiz).addEventListener('input', refrescar);
     refrescar();
 
+    const sel = $('#s-nombre', raiz);
+    const otro = $('#s-nombre-otro', raiz);
+    const nombreServicio = () => (sel.value === '__otro' ? otro.value.trim() : sel.value);
+    sel.addEventListener('change', () => {
+      otro.hidden = sel.value !== '__otro';
+      if (sel.value === '__otro') otro.focus();
+    });
+
     $('#s-guardar', raiz).addEventListener('click', () => {
-      const nombre = $('#s-nombre', raiz).value.trim();
+      const nombre = nombreServicio();
       if (!nombre) return toast('Falta el nombre del servicio');
       const pagado = chipValor(raiz, 'pagado') === 'si';
       const datos = {
@@ -801,6 +995,12 @@ const TITULOS = { mes: () => mesLabelLargo(mesSel), movimientos: () => 'Gastos d
 
 function render() {
   const st = db.get();
+  // Ocultar es de presentación: se aplica antes de dibujar, y no toca ningún cálculo.
+  setOcultarValores(st.config.ocultarValores);
+  const ojo = $('#ojo');
+  ojo.textContent = st.config.ocultarValores ? '◌' : '◉';
+  ojo.setAttribute('aria-pressed', String(!!st.config.ocultarValores));
+  ojo.setAttribute('aria-label', st.config.ocultarValores ? 'Mostrar valores' : 'Ocultar valores');
   $('#titulo').textContent = TITULOS[tab]();
   $('#mes-hoy').hidden = mesSel === mesHoy();
   ({ mes: vistaMes, movimientos: vistaMovimientos, planes: vistaPlanes,
@@ -817,6 +1017,7 @@ $$('#tabs .tab').forEach((b) => b.addEventListener('click', () => {
 $('#mes-prev').addEventListener('click', () => { mesSel = addMeses(mesSel, -1); render(); });
 $('#mes-next').addEventListener('click', () => { mesSel = addMeses(mesSel, 1); render(); });
 $('#mes-hoy').addEventListener('click', () => { mesSel = mesHoy(); render(); });
+$('#ojo').addEventListener('click', () => db.setOcultarValores(!db.get().config.ocultarValores));
 $('#fab').addEventListener('click', () => hojaGasto(null));
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !hoja.hidden) cerrarHoja(); });

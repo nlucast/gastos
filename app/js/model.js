@@ -13,21 +13,32 @@ export const repartoLabel = (reparto, coTitular = 'Co-titular') =>
   : '50/50';
 export const TIPOS = ['1 pago', 'Cuotas'];
 
-export const CATEGORIAS = [
-  'Delivery y comida rápida',
-  'Compras online',
-  'Súper y kiosco',
-  'Salidas y entretenimiento',
-  'Transporte y nafta',
-  'Cosas de la casa',
-  'Ropa',
-  'Salud',
-  'Regalos',
-  'Otros',
+// Catálogo de arranque. Lo que manda es config.categorias, que se edita desde
+// Ajustes: esto es sólo con qué se llena la primera vez.
+// `vigilada` marca las del cotidiano, las que la pantalla de Mes resalta.
+export const CATEGORIAS_DEFAULT = [
+  { nombre: 'Delivery y comida rápida', vigilada: true },
+  { nombre: 'Compras online', vigilada: true },
+  { nombre: 'Súper y kiosco', vigilada: true },
+  { nombre: 'Salidas y entretenimiento', vigilada: true },
+  { nombre: 'Transporte y nafta', vigilada: false },
+  { nombre: 'Cosas de la casa', vigilada: false },
+  { nombre: 'Ropa', vigilada: false },
+  { nombre: 'Salud', vigilada: false },
+  { nombre: 'Regalos', vigilada: false },
+  { nombre: 'Otros', vigilada: false },
 ];
 
-// Las cuatro primeras son el "cotidiano" bajo vigilancia.
-export const CATEGORIAS_COTIDIANO = CATEGORIAS.slice(0, 4);
+// Las secciones de la pantalla Mes, en el orden de fábrica. El orden real sale
+// de config.ordenMes. Los avisos no entran acá: van siempre arriba de todo.
+export const SECCIONES_MES = [
+  { id: 'semaforo',   label: 'Semáforo del mes' },
+  { id: 'nuevos',     label: 'Compromisos nuevos' },
+  { id: 'techo',      label: 'De dónde sale el techo' },
+  { id: 'categorias', label: 'Por categoría' },
+  { id: 'calendario', label: 'Próximos meses' },
+];
+export const ORDEN_MES_DEFAULT = SECCIONES_MES.map((s) => s.id);
 
 /* ---------- plata (centavos) ---------- */
 
@@ -59,8 +70,26 @@ export function parseMoney(input) {
 const fmtAr = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtAr0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
 
-export const money = (cent) => '$ ' + fmtAr.format((cent || 0) / 100);
-export const moneyShort = (cent) => '$ ' + fmtAr0.format(Math.round((cent || 0) / 100));
+/* ---------- ocultar valores ---------- */
+// Un interruptor global de presentación: la app calcula exactamente igual, sólo
+// cambia lo que se dibuja. Por eso vive acá y no en calc.js, que no sabe de pantallas.
+
+const MASCARA = '•••••';
+let oculto = false;
+export const setOcultarValores = (v) => { oculto = !!v; };
+export const valoresOcultos = () => oculto;
+
+// Los cálculos en vivo de los formularios NO se ocultan: el importe que los
+// alimenta ya está a la vista en el input de arriba, así que taparlos no agrega
+// privacidad y sí saca la defensa contra cargar la cuota en vez del total.
+export const moneyCalc = (cent) => '$ ' + fmtAr.format((cent || 0) / 100);
+export const moneyCalcShort = (cent) => '$ ' + fmtAr0.format(Math.round((cent || 0) / 100));
+
+export const money = (cent) => oculto ? '$ ' + MASCARA : moneyCalc(cent);
+export const moneyShort = (cent) => oculto ? '$ ' + MASCARA : moneyCalcShort(cent);
+export const usd = (cent) => oculto ? 'USD ' + MASCARA : 'USD ' + fmtAr.format((cent || 0) / 100);
+// Para los <input>: el valor real, o vacío si está oculto (no se edita a ciegas).
+export const montoInput = (cent) => oculto ? '' : ((cent || 0) / 100).toFixed(2);
 
 /* ---------- fechas ---------- */
 // Un "mes" es siempre la string 'YYYY-MM'.
