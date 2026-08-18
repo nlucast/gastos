@@ -160,6 +160,7 @@ input[type=text], input[type=number], input[type=date], input[type=month], selec
   border-radius: 10px; padding: 11px 12px; outline: none;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--acento); }
+textarea { resize: vertical; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; }
 input.grande { font-size: 27px; font-weight: 650; padding: 12px; text-align: right; font-variant-numeric: tabular-nums; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }

@@ -16,3 +16,6 @@ files.zip
 # Windows
 Thumbs.db
 desktop.ini
+
+# Ayudante local para pasar el respaldo al celular (no se publica)
+app/descargar.html

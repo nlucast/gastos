@@ -385,6 +385,8 @@ function vistaAjustes(st) {
         <button class="btn sec" id="exportar">Exportar</button>
         <button class="btn sec" id="importar">Importar</button>
       </div>
+      <div class="btn-fila"><button class="btn sec" id="importar-texto">Importar pegando el texto</button></div>
+      <div class="sub" style="margin-top:8px">Si el celular no te deja bajar el archivo, abrilo en el navegador, copiá todo y pegalo acá.</div>
       <div class="btn-fila"><button class="btn peligro" id="reset">Empezar de cero</button></div>
     </div>
 
@@ -427,10 +429,52 @@ function vistaAjustes(st) {
     inp.click();
   });
 
+  $('#importar-texto').addEventListener('click', () => hojaImportarTexto());
+
   $('#reset').addEventListener('click', () => {
     if (!confirm('Borra todo lo cargado en este navegador y no se puede deshacer.\n\n¿Exportaste antes?')) return;
     db.reset();
     toast('Listo, todo vacío');
+  });
+}
+
+/* ================= hoja: IMPORTAR PEGANDO ================= */
+
+function hojaImportarTexto() {
+  abrirHoja(`
+    <h2>Importar pegando el texto</h2>
+    <div class="aviso rojo" style="margin-bottom:14px"><span>⚠</span><div>
+      Esto <b>reemplaza todo</b> lo que tengas cargado en este dispositivo. No se puede deshacer.</div></div>
+    <div class="campo">
+      <textarea id="imp-texto" rows="8" placeholder='Pegá acá el contenido del archivo, empieza con {"version"...'></textarea>
+      <div class="hint" id="imp-info"></div>
+    </div>
+    <button class="btn" id="imp-guardar" disabled>Importar</button>
+  `, (raiz) => {
+    const ta = $('#imp-texto', raiz);
+    const btn = $('#imp-guardar', raiz);
+    const info = $('#imp-info', raiz);
+
+    // Se valida mientras pega, así no se entera del error después de reemplazar todo.
+    ta.addEventListener('input', () => {
+      const t = ta.value.trim();
+      if (!t) { info.textContent = ''; btn.disabled = true; return; }
+      try {
+        const d = JSON.parse(t);
+        if (!Array.isArray(d.movimientos)) throw new Error('no parece un respaldo de Gastos');
+        info.innerHTML = `<span class="calc">${d.movimientos.length} gastos · ${(d.planes || []).length} planes · ${(d.servicios || []).length} boletas</span>`;
+        btn.disabled = false;
+      } catch (e) {
+        info.textContent = 'Todavía no es válido: ' + e.message;
+        btn.disabled = true;
+      }
+    });
+
+    btn.addEventListener('click', () => {
+      try { db.importar(ta.value.trim()); cerrarHoja(); toast('Datos importados'); }
+      catch (e) { toast('No se pudo importar: ' + e.message); }
+    });
+    ta.focus();
   });
 }
 
