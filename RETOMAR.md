@@ -93,6 +93,9 @@ servicios    [{ id, mes, servicio, vencimiento, total, reparto,
   entiende formato argentino: `129.000` son ciento veintinueve mil, no 129.
 - **Un mes es siempre la string `'YYYY-MM'`.**
 - **`ultimoCierre` se deriva**, nunca se guarda a mano: `primerCierre + (totalCuotas - 1)`.
+- **Un fijo corre entre `activoDesde` y `activoHasta`** (`null` = sin fin). La regla vive en
+  `fijoActivoEn()` de `calc.js` y se exporta: la pantalla de Fijos y el cálculo del techo
+  tienen que decidir lo mismo.
 - **`reparto` se guarda como token neutro** (`50/50`, `otro100`, `mio100`) y el nombre que se
   muestra sale de `config.coTitular`. Así el código no lleva adentro el nombre de nadie.
 - **Las categorías y los nombres de servicio son configuración, no código.** `model.js` sólo
@@ -141,7 +144,13 @@ otra es "cuánto gasté este mes".
     desglose, que es la misma falla que la regla 3 evita en los planes.
 11. **El cotidiano bajo vigilancia dejó de ser "las primeras cuatro"** y pasó a ser una marca
     por categoría (`vigilada`). Con categorías reordenables, la posición ya no significa nada.
-12. **Ocultar valores es sólo presentación.** Vive en `model.js`, envuelve `money()` y
+12. **Los fijos tienen pantalla propia**, no viven en Ajustes: son plata que se va todos los
+    meses, no configuración que se toca una vez. La pantalla los lista **todos**, con los
+    inactivos apagados al final, porque un fijo dado de baja tiene que seguir siendo editable;
+    si se ocultaran, no habría forma de volver a activarlo. El desglose por canal está puesto
+    pensando en la conciliación del resumen: son los cargos que van a aparecer en la tarjeta
+    sin estar en `movimientos`.
+13. **Ocultar valores es sólo presentación.** Vive en `model.js`, envuelve `money()` y
     `moneyShort()`, y no toca un solo cálculo. Los cálculos en vivo de los formularios usan
     `moneyCalc()` y **no** se ocultan: el importe que los alimenta ya está a la vista en el
     input de arriba, así que taparlos no agrega privacidad y sí saca la defensa de la regla 1.
@@ -209,7 +218,8 @@ Ordenado por lo que más valor agrega:
 - [ ] **Conciliación del resumen de la tarjeta.** La más pesada y la más delicada: los cargos
       esperados son la unión de movimientos + primeras cuotas + cuotas de planes + fijos que
       caen en esa tarjeta + servicios que se pagan con ella. Si no se contemplan los fijos, la
-      conciliación marca todo como "no registrado" y a las dos veces se deja de mirar.
+      conciliación marca todo como "no registrado" y a las dos veces se deja de mirar. El
+      desglose por canal de la pantalla de Fijos ya resuelve una parte.
 - [ ] Tabla de cierres reales por tarjeta, para reemplazar la aproximación del día 26.
 - [ ] Un `repartoDefault` por servicio del catálogo, para que la boleta nueva ya venga con el
       reparto puesto. Hoy el catálogo guarda sólo el nombre.

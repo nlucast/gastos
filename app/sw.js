@@ -1,7 +1,7 @@
 // sw.js — cache para que la app abra sin señal.
 // Subí CACHE cuando cambies archivos, si no el celular sigue con la versión vieja.
 
-const CACHE = 'gastos-v4';
+const CACHE = 'gastos-v5';
 const ARCHIVOS = [
   './', './index.html', './manifest.webmanifest',
   './css/styles.css',

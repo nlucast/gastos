@@ -9,7 +9,10 @@ import { difMeses, mesDe, addMeses } from './model.js';
 import { cuotaDe } from './store.js';
 
 const suma = (arr, fn) => arr.reduce((a, x) => a + (fn(x) || 0), 0);
-const activo = (f, mes) =>
+// Un fijo pesa en el mes si el mes cae dentro de su rango de actividad.
+// Se exporta porque la pantalla de Fijos también lo necesita, y la regla de
+// cuándo un fijo cuenta tiene que estar escrita en un solo lugar.
+export const fijoActivoEn = (f, mes) =>
   (!f.activoDesde || difMeses(f.activoDesde, mes) >= 0) &&
   (!f.activoHasta || difMeses(mes, f.activoHasta) >= 0);
 
@@ -70,8 +73,8 @@ export function serviciosVencidos(st, hoyISO) {
 /* ---------- fijos ---------- */
 
 export function fijosDelMes(st, mes) {
-  const pesos = st.fijosPesos.filter((f) => activo(f, mes));
-  const usd = st.fijosUsd.filter((f) => activo(f, mes));
+  const pesos = st.fijosPesos.filter((f) => fijoActivoEn(f, mes));
+  const usd = st.fijosUsd.filter((f) => fijoActivoEn(f, mes));
   const cot = st.config.cotizacionUsd || 0;
   const totalUsd = suma(usd, (f) => Math.round((f.montoUsd * cot) / 100));
   return { pesos, usd, totalPesos: suma(pesos, (f) => f.monto), totalUsd, sinCotizacion: usd.length > 0 && !cot };

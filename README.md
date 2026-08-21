@@ -38,8 +38,9 @@ La app arranca vacía. Lo primero es cargar el sueldo en Ajustes, o importar un 
 | **Mes** | Semáforo del techo, ritmo de gasto por día, compromisos nuevos, desglose por categoría y calendario de 12 meses. El mes se cambia con las flechas de los extremos. El orden de las secciones se configura en Ajustes. |
 | **Gastos** | Los movimientos del mes. Tocá uno para editarlo. |
 | **Cuotas** | Planes activos, cuánto pesa cada tarjeta en el cierre, total pendiente. |
+| **Fijos** | Lo que se va todos los meses igual: total del mes, de qué canal sale cada peso, y los de dólares convertidos. Los dados de baja siguen en la lista, apagados. |
 | **Servicios** | Boletas con reparto, marca de pagado y alerta de vencidas. |
-| **Ajustes** | Sueldo, meta de ahorro del mes, cotización del dólar, categorías, servicios, fijos, orden de la pantalla Mes, respaldos. |
+| **Ajustes** | Sueldo, meta de ahorro del mes, cotización del dólar, categorías, servicios, orden de la pantalla Mes, respaldos. |
 
 El botón **+** carga un gasto desde cualquier pantalla. El **◉** al lado del título oculta todos
 los importes, para mirar la app con alguien al lado.
@@ -57,6 +58,8 @@ los importes, para mirar la app con alguien al lado.
   muestra la **cuota mensual agregada**, que es el dato que de verdad importa.
 - **Anti doble conteo**: si el concepto que cargás coincide con un fijo o un servicio, avisa.
   Eso ya está descontado del disponible.
+- **Un fijo que dejó de correr se da de baja con `Hasta`, no se borra.** Borrarlo cambiaría
+  los meses anteriores, que ya estaban bien.
 - **Servicios**: con menos de 4 boletas cargadas el mes se considera incompleto y usa el
   promedio de los últimos 3 meses completos, avisando que el disponible está inflado.
 - **Las categorías se editan** (agregar, renombrar, ordenar, marcar como cotidiano). Renombrar

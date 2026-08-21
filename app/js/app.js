@@ -10,6 +10,7 @@ import {
 import * as db from './store.js';
 import {
   resumenMes, porCategoria, calendario, ritmo, cuotaNumero, planActivoEn,
+  fijosDelMes, fijoActivoEn,
   parteMia, parteOtro, serviciosDelMes, serviciosVencidos, promedioServicios, MIN_SERVICIOS,
 } from './calc.js';
 
@@ -286,6 +287,86 @@ function vistaPlanes(st) {
   $('#nuevo-plan').addEventListener('click', () => hojaPlan(null));
 }
 
+/* ================= pantalla: FIJOS ================= */
+
+function vistaFijos(st) {
+  const f = fijosDelMes(st, mesSel);
+  const cot = st.config.cotizacionUsd;
+  const total = f.totalPesos + f.totalUsd;
+
+  // A qué canal le cae cada peso. Un fijo que cae en tarjeta aparece en el
+  // resumen del banco aunque nunca se cargue como gasto: sin esta vista, a la
+  // hora de conciliar el resumen todos esos cargos figuran como "no registrados".
+  const enPesos = (x) => x.monto;
+  const enUsd = (x) => Math.round((x.montoUsd * (cot || 0)) / 100);
+  const porCanal = CANALES
+    .map((c) => ({
+      canal: c,
+      monto: f.pesos.filter((x) => x.canal === c).reduce((a, x) => a + enPesos(x), 0)
+           + f.usd.filter((x) => x.canal === c).reduce((a, x) => a + enUsd(x), 0),
+    }))
+    .filter((x) => x.monto > 0)
+    .sort((a, b) => b.monto - a.monto);
+
+  // Los que no corren este mes igual se listan, apagados: si no, un fijo dado de
+  // baja se vuelve invisible y no hay forma de volver a activarlo.
+  const lista = (arr, esUsd) => {
+    const ordenada = [...arr].sort((a, b) => {
+      const aa = fijoActivoEn(a, mesSel), ba = fijoActivoEn(b, mesSel);
+      if (aa !== ba) return aa ? -1 : 1;
+      return (esUsd ? b.montoUsd - a.montoUsd : b.monto - a.monto);
+    });
+    return ordenada.map((x) => {
+      const act = fijoActivoEn(x, mesSel);
+      const estado = act ? '' :
+        (x.activoHasta && difMeses(x.activoHasta, mesSel) > 0) ? ` · terminó ${mesLabel(x.activoHasta)}`
+        : ` · arranca ${mesLabel(x.activoDesde)}`;
+      return `<button class="item" data-${esUsd ? 'fijousd' : 'fijo'}="${x.id}" style="${act ? '' : 'opacity:.5'}">
+        <div class="cuerpo">
+          <div class="t">${esc(x.concepto)}</div>
+          <div class="d">${esc(x.canal)}${esUsd ? ' · ' + usd(x.montoUsd) : ''}${estado}</div>
+        </div>
+        <div class="monto">${esUsd
+          ? (cot ? money(enUsd(x)) : '<span class="sub">sin cotiz.</span>')
+          : money(x.monto)}</div>
+      </button>`;
+    }).join('');
+  };
+
+  vista.innerHTML = `
+    <div class="card">
+      <div class="fila fuerte" style="padding-top:0"><span class="k">Fijos de ${mesLabel(mesSel)}</span><span class="v">${money(total)}</span></div>
+      <div class="fila"><span class="k">En pesos <span class="sub">(${f.pesos.length})</span></span><span class="v">${money(f.totalPesos)}</span></div>
+      <div class="fila"><span class="k">En dólares <span class="sub">(${f.usd.length})</span></span><span class="v">${money(f.totalUsd)}</span></div>
+      ${f.sinCotizacion ? `<div class="aviso naranja" style="margin-top:12px"><span>⚠</span><div>
+        Falta la <b>cotización del dólar</b> en Ajustes: los fijos en USD están contando $ 0 y el disponible se ve más alto.</div></div>` : ''}
+      ${porCanal.length ? `<div class="sub" style="margin-top:12px">De dónde sale</div>
+        ${porCanal.map((x) => `<div class="fila"><span class="k">${esc(x.canal)}</span><span class="v">${money(x.monto)}</span></div>`).join('')}` : ''}
+    </div>
+
+    <div class="card">
+      <div class="card-t">En pesos</div>
+      <div class="lista">${lista(st.fijosPesos, false) || '<div class="vacio">Sin fijos cargados.</div>'}</div>
+      <div class="btn-fila"><button class="btn sec" id="nuevo-fijo">Agregar fijo</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-t">En dólares</div>
+      <div class="lista">${lista(st.fijosUsd, true) || '<div class="vacio">Sin fijos en dólares.</div>'}</div>
+      <div class="btn-fila"><button class="btn sec" id="nuevo-fijousd">Agregar fijo en USD</button></div>
+      <div class="sub" style="margin-top:10px">Si un servicio en dólares lo cobra una tarjeta en pesos, con recargo, y además se comparte, no va acá: va en Servicios.</div>
+    </div>
+
+    <div class="sub">Los fijos ya están descontados del disponible: <b>no se cargan como gasto</b>. Si un fijo dejó de correr, ponele
+      <b>Hasta</b> en vez de borrarlo, así los meses anteriores siguen dando bien.</div>
+  `;
+
+  $$('[data-fijo]', vista).forEach((b) => b.addEventListener('click', () => hojaFijo(st.fijosPesos.find((x) => x.id === b.dataset.fijo), false)));
+  $$('[data-fijousd]', vista).forEach((b) => b.addEventListener('click', () => hojaFijo(st.fijosUsd.find((x) => x.id === b.dataset.fijousd), true)));
+  $('#nuevo-fijo').addEventListener('click', () => hojaFijo(null, false));
+  $('#nuevo-fijousd').addEventListener('click', () => hojaFijo(null, true));
+}
+
 /* ================= pantalla: SERVICIOS ================= */
 
 function vistaServicios(st) {
@@ -416,27 +497,6 @@ function vistaAjustes(st) {
     </div>
 
     <div class="card">
-      <div class="card-t">Fijos en pesos · ${money(st.fijosPesos.reduce((a, f) => a + f.monto, 0))}</div>
-      <div class="lista">
-        ${st.fijosPesos.map((f) => `<button class="item" data-fijo="${f.id}">
-          <div class="cuerpo"><div class="t">${esc(f.concepto)}</div><div class="d">${esc(f.canal)}</div></div>
-          <div class="monto">${money(f.monto)}</div></button>`).join('')}
-      </div>
-      <div class="btn-fila"><button class="btn sec" id="nuevo-fijo">Agregar fijo</button></div>
-    </div>
-
-    <div class="card">
-      <div class="card-t">Fijos en dólares</div>
-      <div class="lista">
-        ${st.fijosUsd.map((f) => `<button class="item" data-fijousd="${f.id}">
-          <div class="cuerpo"><div class="t">${esc(f.concepto)}</div><div class="d">${esc(f.canal)} · ${usd(f.montoUsd)}</div></div>
-          <div class="monto">${cot ? money(Math.round(f.montoUsd * cot / 100)) : '<span class="sub">sin cotiz.</span>'}</div></button>`).join('')}
-      </div>
-      <div class="btn-fila"><button class="btn sec" id="nuevo-fijousd">Agregar fijo en USD</button></div>
-      <div class="sub" style="margin-top:10px">Si un servicio en dólares lo cobra una tarjeta en pesos, con recargo, y además se comparte, no va acá: va en Servicios.</div>
-    </div>
-
-    <div class="card">
       <div class="card-t">Orden de la pantalla Mes</div>
       <div class="orden">
         ${st.config.ordenMes.map((id, i) => {
@@ -464,7 +524,8 @@ function vistaAjustes(st) {
       <div class="btn-fila"><button class="btn peligro" id="reset">Empezar de cero</button></div>
     </div>
 
-    <div class="sub">Los montos van en centavos por dentro, así no hay errores de redondeo. Un mes es siempre el día 1.</div>
+    <div class="sub">Los <b>fijos</b> se mudaron a su propia pestaña, la del ↻ abajo. Los montos van en centavos por dentro,
+      así no hay errores de redondeo. Un mes es siempre el día 1.</div>
   `;
 
   $('#cfg-guardar').addEventListener('click', () => {
@@ -492,11 +553,6 @@ function vistaAjustes(st) {
   $$('[data-sec-sube]', vista).forEach((b) => b.addEventListener('click', () => db.moverSeccionMes(b.dataset.secSube, -1)));
   $$('[data-sec-baja]', vista).forEach((b) => b.addEventListener('click', () => db.moverSeccionMes(b.dataset.secBaja, 1)));
   $('#orden-reset').addEventListener('click', () => { db.resetOrdenMes(); toast('Orden original'); });
-
-  $$('[data-fijo]', vista).forEach((b) => b.addEventListener('click', () => hojaFijo(st.fijosPesos.find((f) => f.id === b.dataset.fijo), false)));
-  $$('[data-fijousd]', vista).forEach((b) => b.addEventListener('click', () => hojaFijo(st.fijosUsd.find((f) => f.id === b.dataset.fijousd), true)));
-  $('#nuevo-fijo').addEventListener('click', () => hojaFijo(null, false));
-  $('#nuevo-fijousd').addEventListener('click', () => hojaFijo(null, true));
 
   $('#exportar').addEventListener('click', () => {
     const blob = new Blob([db.exportar()], { type: 'application/json' });
@@ -991,7 +1047,8 @@ function hojaFijo(fijo, esUsd) {
 /* ================= router ================= */
 
 const TITULOS = { mes: () => mesLabelLargo(mesSel), movimientos: () => 'Gastos de ' + mesLabel(mesSel),
-                  planes: () => 'Cuotas', servicios: () => 'Servicios ' + mesLabel(mesSel), ajustes: () => 'Ajustes' };
+                  planes: () => 'Cuotas', fijos: () => 'Fijos ' + mesLabel(mesSel),
+                  servicios: () => 'Servicios ' + mesLabel(mesSel), ajustes: () => 'Ajustes' };
 
 function render() {
   const st = db.get();
@@ -1003,7 +1060,7 @@ function render() {
   ojo.setAttribute('aria-label', st.config.ocultarValores ? 'Mostrar valores' : 'Ocultar valores');
   $('#titulo').textContent = TITULOS[tab]();
   $('#mes-hoy').hidden = mesSel === mesHoy();
-  ({ mes: vistaMes, movimientos: vistaMovimientos, planes: vistaPlanes,
+  ({ mes: vistaMes, movimientos: vistaMovimientos, planes: vistaPlanes, fijos: vistaFijos,
      servicios: vistaServicios, ajustes: vistaAjustes }[tab])(st);
   vista.scrollTop = 0;
 }
